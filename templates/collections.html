@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('collections') }}{% endblock %}
+{% block content %}
+<form class="filter-bar" method="get">
+  <select class="form-select" name="year">
+    <option value="">{{ t('year') }}</option>
+    {% for y in years %}
+    <option value="{{ y }}" {% if filters.year == y|string %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+  <select class="form-select" name="half">
+    <option value="">{{ t('half') }}</option>
+    <option value="1" {% if filters.half == '1' %}selected{% endif %}>{{ t('half_1') }}</option>
+    <option value="2" {% if filters.half == '2' %}selected{% endif %}>{{ t('half_2') }}</option>
+  </select>
+  <select class="form-select" name="status">
+    <option value="">{{ t('filter_all') }}</option>
+    {% for s in ['issued','acknowledged','paid'] %}
+    <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ t('status_' + s) }}</option>
+    {% endfor %}
+  </select>
+  <select class="form-select" name="subsidiary">
+    <option value="">{{ t('subsidiary') }}</option>
+    {% for s in subs %}
+    <option value="{{ s.code }}" {% if filters.subsidiary == s.code %}selected{% endif %}>{{ s.code }}</option>
+    {% endfor %}
+  </select>
+  <input class="form-control" name="q" value="{{ filters.q }}" placeholder="{{ t('search') }}">
+  <button class="btn btn-navy" type="submit">{{ t('filter') }}</button>
+  <a class="btn btn-outline-navy" href="{{ url_for('invoices_export', status=filters.status, year=filters.year, half=filters.half, subsidiary=filters.subsidiary, q=filters.q) }}">{{ t('export_csv') }}</a>
+</form>
+<form class="toolbar mb-3" method="post" action="{{ url_for('invoices_hq_copy', **request.args) }}" onsubmit="return confirm('{{ t('confirm_hq_bulk') }}');">
+  <p class="muted mb-0">{{ t('hq_bulk_help') }} · {{ t('hq_copy_to') }}: <b>{{ hq_copy_email }}</b></p>
+  <input type="hidden" name="next" value="collections">
+  <button class="btn btn-outline-navy" type="submit"><i class="bi bi-envelope"></i> {{ t('hq_bulk_send') }}</button>
+</form>
+
+<section class="card-panel mb-3">
+  <div class="table-responsive">
+    <table class="table table-clean align-middle">
+      <thead>
+        <tr>
+          <th>{{ t('invoice_no') }}</th>
+          <th>{{ t('subsidiary') }}</th>
+          <th class="text-end">FX</th>
+          <th>{{ t('status') }}</th>
+          <th>{{ t('acked_at') }}</th>
+          <th>{{ t('payment_date') }}</th>
+          <th>{{ t('actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="mono"><a href="{{ url_for('invoice_detail', iid=row.id) }}">{{ row.invoice_no }}</a></td>
+          <td>{{ row.subsidiary.code }}<div class="tiny">{{ row.subsidiary.name_en }}</div></td>
+          <td class="text-end">{{ row.currency }} {{ row.amount_fx | fx }}</td>
+          <td><span class="badge-status s-{{ row.status }}">{{ status_label(row.status) }}</span></td>
+          <td>{{ row.acknowledged_at | dt }}<div class="tiny">{{ row.acknowledged_by or '' }}</div></td>
+          <td>{{ row.payment_date | ymd }}</td>
+          <td class="nowrap">
+            {% if row.status in ['issued','acknowledged'] %}
+            <form class="d-inline" method="post" action="{{ url_for('invoice_remind', iid=row.id) }}">
+              <button class="btn btn-sm btn-outline-navy" type="submit">{{ t('remind') }}</button>
+            </form>
+            {% endif %}
+            <a class="btn btn-sm btn-ghost" href="{{ url_for('invoice_detail', iid=row.id) }}">{{ t('view') }}</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">{{ t('no_data') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card-panel">
+  <h3 class="h6">{{ t('history') }}</h3>
+  <ul class="log-list">
+    {% for log in logs %}
+    <li><span class="mono">{{ log.created_at | dt }}</span> [{{ log.entity_type }} {{ log.entity_id }}] {{ log.action }} · {{ log.username }}
+      <div class="tiny">{{ log.details }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

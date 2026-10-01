@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('dashboard') }}{% endblock %}
+{% block content %}
+<form class="filter-bar" method="get">
+  <div class="filter-label">{{ t('period_label') }}</div>
+  <select name="year" class="form-select">
+    {% for y in years %}
+    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+  <select name="half" class="form-select">
+    <option value="" {% if not half %}selected{% endif %}>{{ t('all') }} {{ t('half') }}</option>
+    <option value="1" {% if half == 1 %}selected{% endif %}>{{ t('half_1') }}</option>
+    <option value="2" {% if half == 2 %}selected{% endif %}>{{ t('half_2') }}</option>
+  </select>
+  <button class="btn btn-navy" type="submit">{{ t('apply') }}</button>
+  <span class="muted">{{ t('overview_help') }}</span>
+</form>
+
+<div class="stat-grid">
+  <article class="stat-card">
+    <div class="stat-label">{{ t('total_krw') }}</div>
+    <div class="stat-value">KRW {{ stats.total_krw | krw }}</div>
+    <div class="stat-sub">{{ t('this_period') }} · {{ year }}{% if half %}-{{ '%02d'|format(half) }}{% endif %}</div>
+  </article>
+  <article class="stat-card">
+    <div class="stat-label">{{ t('total_fx') }}</div>
+    <div class="stat-value">USD {{ stats.usd | fx }}</div>
+    <div class="stat-sub">EUR {{ stats.eur | fx }} · {{ t('vat_note') }}</div>
+  </article>
+  <article class="stat-card accent">
+    <div class="stat-label">{{ t('ack_status') }}</div>
+    <div class="stat-value">{{ stats.ack_entities }} <span class="slash">/</span> {{ stats.pending_entities }}</div>
+    <div class="stat-sub">{{ t('acknowledged') }} / {{ t('unacknowledged') }} · {{ t('of_62') }} ({{ stats.entity_total }})</div>
+  </article>
+  <article class="stat-card">
+    <div class="stat-label">{{ t('paid_amount') }}</div>
+    <div class="stat-value">KRW {{ stats.paid_krw | krw }}</div>
+    <div class="stat-sub">{{ t('issued_count') }} {{ stats.issued_count }}</div>
+  </article>
+</div>
+
+<div class="two-col">
+  <section class="card-panel">
+    <div class="section-head">
+      <h2>{{ t('ack_status') }}</h2>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="ackChart"></canvas>
+    </div>
+    <div class="legend-inline">
+      <span><i class="dot ack"></i> {{ t('ack_entities') }} {{ stats.ack_entities }}</span>
+      <span><i class="dot pending"></i> {{ t('pending_entities') }} {{ stats.pending_entities }}</span>
+      <span><i class="dot none"></i> {{ t('no_data') }} {{ stats.no_invoice }}</span>
+    </div>
+  </section>
+  <section class="card-panel">
+    <div class="section-head">
+      <h2>{{ t('status') }}</h2>
+      {% if current_user.role == 'admin' %}
+      <a class="btn btn-sm btn-navy" href="{{ url_for('invoice_new') }}">{{ t('quick_create') }}</a>
+      {% endif %}
+    </div>
+    <div class="status-tiles">
+      {% for key in ['draft','issued','acknowledged','paid'] %}
+      <a class="tile s-{{ key }}" href="{{ url_for('invoices', year=year, half=half, status=key) }}">
+        <b>{{ stats.status_counts[key] }}</b>
+        <span>{{ t('status_' + key) }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="mini-meta">
+      {{ t('stat_entities') }} {{ sub_count }} · {{ t('stat_trainings') }} {{ training_count }}
+    </div>
+  </section>
+</div>
+
+<section class="card-panel">
+  <div class="section-head">
+    <h2>{{ t('recent_invoices') }}</h2>
+    <a href="{{ url_for('invoices') }}">{{ t('view') }} →</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-clean">
+      <thead>
+        <tr>
+          <th>{{ t('invoice_no') }}</th>
+          <th>{{ t('subsidiary') }}</th>
+          <th>{{ t('education') }}</th>
+          <th class="text-end">{{ t('amount_krw') }}</th>
+          <th class="text-end">{{ t('amount_fx') }}</th>
+          <th>{{ t('status') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats.recent %}
+        <tr>
+          <td><a href="{{ url_for('invoice_detail', iid=row.id) }}">{{ row.invoice_no }}</a></td>
+          <td>{{ row.subsidiary.code }}<div class="tiny">{{ row.subsidiary.name_en }}</div></td>
+          <td>{{ row.education_name }}</td>
+          <td class="text-end">{{ row.amount_krw | krw }}</td>
+          <td class="text-end">{{ row.currency }} {{ row.amount_fx | fx }}</td>
+          <td><span class="badge-status s-{{ row.status }}">{{ status_label(row.status) }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">{{ t('no_data') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  const ctx = document.getElementById('ackChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['{{ t("acknowledged") }}', '{{ t("unacknowledged") }}', '{{ t("no_data") }}'],
+        datasets: [{
+          data: [{{ stats.ack_entities }}, {{ stats.pending_entities }}, {{ stats.no_invoice }}],
+          backgroundColor: ['#1F7A54', '#C45C26', '#C5D0DC'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        cutout: '68%'
+      }
+    });
+  }
+</script>
+{% endblock %}

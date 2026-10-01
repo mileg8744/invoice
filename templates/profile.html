@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "macros.html" import address_en_field with context %}
+{% block page_title %}{{ t('profile') }}{% endblock %}
+{% block content %}
+<div class="card-panel" style="max-width:760px">
+  <div class="mb-3">
+    <div class="mono">{{ row.code }}</div>
+    <h2 class="h5 mb-0">{{ row.name_en }}</h2>
+    <div class="muted">{{ row.name_ko }} · {{ row.country_en }}</div>
+  </div>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">{{ t('address_en') }}</label>
+      {{ address_en_field('address_en', row.address_en, 3, true, row.country_en) }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">{{ t('emails') }}</label>
+      <textarea class="form-control" name="emails" rows="4" placeholder="{{ t('emails_hint') }}">{{ row.emails }}</textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">{{ t('phone') }}</label>
+      <input class="form-control" name="phone" value="{{ row.phone }}">
+    </div>
+    <button class="btn btn-navy" type="submit">{{ t('save_profile') }}</button>
+  </form>
+</div>
+{% endblock %}

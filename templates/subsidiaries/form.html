@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "macros.html" import address_en_field with context %}
+{% block page_title %}{% if row %}{{ t('edit') }}{% else %}{{ t('new_subsidiary') }}{% endif %}{% endblock %}
+{% block content %}
+<div class="card-panel" style="max-width:860px">
+  <form method="post">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">{{ t('code') }}</label>
+        <input class="form-control" name="code" value="{{ row.code if row else '' }}" {% if row %}readonly{% endif %} required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">{{ t('region') }}</label>
+        <select class="form-select" name="region" required>
+          <option value="">{{ t('select') }}</option>
+          {% for ko, en in regions %}
+          <option value="{{ ko }}" {% if row and row.region == ko %}selected{% endif %}>{% if lang == 'en' %}{{ en }}{% else %}{{ ko }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">{{ t('country') }}</label>
+        <input class="form-control" name="country" value="{{ row.country if row else '' }}" required>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">{{ t('country') }} (EN)</label>
+        <input class="form-control" name="country_en" value="{{ row.country_en if row else '' }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">{{ t('name') }}</label>
+        <input class="form-control" name="name_ko" value="{{ row.name_ko if row else '' }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">{{ t('name_en') }}</label>
+        <input class="form-control" name="name_en" value="{{ row.name_en if row else '' }}" required>
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ t('address_en') }}</label>
+        {{ address_en_field('address_en', row.address_en if row else '', 2, false, row.country_en if row else '') }}
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">{{ t('emails') }}</label>
+        <textarea class="form-control" name="emails" rows="3" placeholder="{{ t('emails_hint') }}">{{ row.emails if row else '' }}</textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">{{ t('phone') }}</label>
+        <input class="form-control" name="phone" value="{{ row.phone if row else '' }}">
+        <label class="form-label mt-3">{{ t('account_status') }}</label>
+        <select class="form-select" name="status">
+          <option value="active" {% if not row or row.status == 'active' %}selected{% endif %}>{{ t('active') }}</option>
+          <option value="inactive" {% if row and row.status == 'inactive' %}selected{% endif %}>{{ t('inactive') }}</option>
+        </select>
+      </div>
+    </div>
+    <div class="mt-4 d-flex gap-2">
+      <button class="btn btn-navy" type="submit">{{ t('save') }}</button>
+      <a class="btn btn-ghost" href="{{ url_for('subsidiaries') }}">{{ t('cancel') }}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

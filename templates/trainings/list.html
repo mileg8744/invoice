@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('trainings') }}{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <div></div>
+  <a class="btn btn-navy" href="{{ url_for('training_new') }}"><i class="bi bi-plus"></i> {{ t('new_training') }}</a>
+</div>
+<form method="post" action="{{ url_for('training_bulk_invoices') }}" onsubmit="return confirm('{{ t('confirm_bulk_invoices') }}');">
+<div class="card-panel mb-3">
+  <div class="upload-inline wrap">
+    <strong>{{ t('bulk_from_trainings') }}</strong>
+    <span class="muted">{{ t('bulk_from_trainings_help') }}</span>
+    <select class="form-select" name="currency" style="max-width:110px">
+      <option value="USD" {% if fx_currency == 'USD' %}selected{% endif %}>USD</option>
+      <option value="EUR" {% if fx_currency == 'EUR' %}selected{% endif %}>EUR</option>
+    </select>
+    <input class="form-control" style="max-width:140px" type="number" step="0.0001" min="0.0001" name="exchange_rate" value="{{ fx_rate }}" placeholder="{{ t('rate') }}" required>
+    <input class="form-control" style="max-width:160px" type="date" name="rate_date" value="{{ fx_rate_date }}" required>
+    <button class="btn btn-navy" type="submit" {% if not rows %}disabled{% endif %}>{{ t('bulk_from_trainings') }}</button>
+  </div>
+</div>
+<section class="card-panel">
+  <div class="table-responsive">
+    <table class="table table-clean">
+      <thead>
+        <tr>
+          <th style="width:42px">
+            <input class="form-check-input" type="checkbox" id="chkAll" {% if rows %}checked{% endif %}>
+          </th>
+          <th>{{ t('education') }}</th>
+          <th>{{ t('period') }}</th>
+          <th>{{ t('instructor') }}</th>
+          <th class="text-end">{{ t('learner_count') }}</th>
+          <th class="text-end">{{ t('unit_krw') }}</th>
+          <th>{{ t('actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <input class="form-check-input" type="checkbox" name="training_ids" value="{{ row.id }}" checked>
+          </td>
+          <td>{{ row.title }}</td>
+          <td>{{ row.start_date | ymd }} ~ {{ row.end_date | ymd }}</td>
+          <td>{{ row.instructor }}</td>
+          <td class="text-end">{{ learner_counts.get(row.id, 0) }}</td>
+          <td class="text-end">{{ row.unit_price_krw | krw }}</td>
+          <td class="nowrap">
+            <a class="btn btn-sm btn-outline-navy" href="{{ url_for('training_edit', tid=row.id) }}">{{ t('edit') }}</a>
+            <button class="btn btn-sm btn-ghost" type="submit" form="del-{{ row.id }}" onclick="return confirm('{{ t('confirm_delete') }}');">{{ t('delete') }}</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">{{ t('no_data') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+</form>
+{% for row in rows %}
+<form id="del-{{ row.id }}" method="post" action="{{ url_for('training_delete', tid=row.id) }}"></form>
+{% endfor %}
+<script>
+  const chkAll = document.getElementById("chkAll");
+  const boxes = () => Array.from(document.querySelectorAll('input[name="training_ids"]'));
+  if (chkAll) {
+    chkAll.addEventListener("change", () => {
+      boxes().forEach((el) => { el.checked = chkAll.checked; });
+    });
+    boxes().forEach((el) => {
+      el.addEventListener("change", () => {
+        chkAll.checked = boxes().length > 0 && boxes().every((b) => b.checked);
+      });
+    });
+  }
+</script>
+{% endblock %}

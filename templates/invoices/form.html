@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block page_title %}{% if row %}{{ t('invoice_edit') }}{% else %}{{ t('create_invoice') }}{% endif %}{% endblock %}
+{% block content %}
+<div class="card-panel">
+  <p class="muted">{{ t('seq_rule') }} · {{ t('half_auto') }} · {{ t('vat_note') }}</p>
+  <form method="post" id="invoiceForm">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">{{ t('select_subsidiary') }}</label>
+        <select class="form-select" name="subsidiary_id" required>
+          <option value="">{{ t('select') }}</option>
+          {% for s in subs %}
+          <option value="{{ s.id }}" data-code="{{ s.code }}" {% if row and row.subsidiary_id == s.id %}selected{% endif %}>{{ s.code }} · {{ s.name_en }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">{{ t('document_date') }}</label>
+        <input class="form-control" type="date" name="document_date" value="{{ row.document_date.strftime('%Y-%m-%d') if row else today }}">
+      </div>
+      <div class="col-md-1">
+        <label class="form-label">{{ t('currency') }}</label>
+        <select class="form-select" name="currency" id="currency">
+          <option value="USD" {% if not row or row.currency == 'USD' %}selected{% endif %}>USD</option>
+          <option value="EUR" {% if row and row.currency == 'EUR' %}selected{% endif %}>EUR</option>
+        </select>
+      </div>
+      <div class="col-md-1">
+        <label class="form-label">{{ t('rate') }}</label>
+        <input class="form-control" type="number" step="0.0001" min="0.0001" name="exchange_rate" id="exchange_rate" value="{{ row.exchange_rate if row else '' }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">{{ t('rate_date') }}</label>
+        <input class="form-control" type="date" name="rate_date" value="{{ row.rate_date.strftime('%Y-%m-%d') if row else default_rate_date }}" required>
+      </div>
+    </div>
+
+    <div class="program-catalog mt-4">
+      <div class="section-head">
+        <h2>{{ t('catalog') }}</h2>
+      </div>
+      <p class="muted mb-2">{{ t('multi_program_hint') }} {{ t('learners_from_training') }}</p>
+      <p class="muted mb-2" id="catalogFilterHint">{{ t('catalog_need_entity') }}</p>
+      <div class="d-flex gap-2 flex-wrap align-items-start">
+        <select class="form-select" id="catalogSelect" multiple size="6" style="max-width:640px"></select>
+        <div class="d-flex flex-column gap-2">
+          <button class="btn btn-navy" type="button" id="btnAddSelected">{{ t('add_selected') }}</button>
+          <button class="btn btn-outline-navy" type="button" id="btnAddCustom">{{ t('add_custom_line') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head mt-4">
+      <h2>{{ t('programs') }}</h2>
+    </div>
+    <div id="programLines"></div>
+
+    <div class="calc-box mt-4" id="calcBox">
+      <div class="muted">{{ t('calc_preview') }} · {{ t('fx_calc') }}</div>
+      <div class="calc-nums">
+        <div>KRW <b id="previewKrw">0</b></div>
+        <div>FX <b id="previewFx">0.00</b></div>
+        <div>{{ t('vat') }} <b>{{ t('exempt') }}</b></div>
+      </div>
+    </div>
+    <div class="mt-4 d-flex gap-2">
+      <button class="btn btn-navy" type="submit">{{ t('save') }}</button>
+      <a class="btn btn-ghost" href="{{ url_for('invoices') }}">{{ t('cancel') }}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const CATALOG = {{ catalog | tojson }};
+  const EXISTING = {{ program_rows | tojson }};
+  const linesEl = document.getElementById('programLines');
+  const catalogById = Object.fromEntries(CATALOG.map(t => [String(t.id), t]));
+  const subSelect = document.querySelector('[name="subsidiary_id"]');
+
+  function selectedEntityCode() {
+    const opt = subSelect && subSelect.selectedOptions && subSelect.selectedOptions[0];
+    return String((opt && opt.dataset && opt.dataset.code) || '').toUpperCase();
+  }
+
+  function learnersTextFor(data) {
+    const byCode = (data && data.learners_by_code) || {};
+    const code = selectedEntityCode();
+    if (code && byCode[code]) return byCode[code];
+    return (data && data.learners) || '';
+  }
+
+  function withCatalogLearners(data) {
+    if (!data || !data.learners_by_code) return data || {};
+    const learners = learnersTextFor(data);
+    const count = learners.split(/\n/).map(s => s.trim()).filter(Boolean).length;
+    return Object.assign({}, data, {
+      learners,
+      qty: Math.max(Number(data.qty || 1), count || 1),
+    });
+  }
+
+  function lineHtml(data = {}) {
+    const trainingId = data.training_id || data.id || '';
+    const title = data.education_name || '';
+    const instructor = data.instructor || '';
+    const start = data.period_start || '';
+    const end = data.period_end || '';
+    const qty = data.qty || 1;
+    const unit = data.unit_price_krw || 0;
+    const learners = data.learners || '';
+    return `
+      <div class="program-line card-panel mb-3">
+        <input type="hidden" name="item_training_id" value="${trainingId}">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label">{{ t('education') }}</label>
+            <input class="form-control item-title" name="item_education_name" value="${escapeAttr(title)}" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">{{ t('instructor') }}</label>
+            <input class="form-control" name="item_instructor" value="${escapeAttr(instructor)}">
+          </div>
+          <div class="col-md-3 text-end">
+            <button class="btn btn-sm btn-ghost btn-remove" type="button">{{ t('remove_line') }}</button>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">{{ t('period') }} Start</label>
+            <input class="form-control" type="date" name="item_period_start" value="${start}" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">{{ t('period') }} End</label>
+            <input class="form-control" type="date" name="item_period_end" value="${end}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">{{ t('qty') }}</label>
+            <input class="form-control item-qty" type="number" min="1" name="item_qty" value="${qty}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">{{ t('unit_krw') }}</label>
+            <input class="form-control item-unit" type="number" min="0" name="item_unit_price_krw" value="${unit}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">KRW</label>
+            <div class="form-control-plaintext fw-bold item-line-krw">0</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">{{ t('learners') }}</label>
+            <textarea class="form-control item-learners" name="item_learners" rows="4" placeholder="{{ t('learner_optional') }}">${escapeAttr(learners)}</textarea>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function escapeAttr(v) {
+    return String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  }
+
+  function trainingHasLearners(tid) {
+    const cat = catalogById[String(tid || '')];
+    const code = selectedEntityCode();
+    if (!cat || !code) return false;
+    return Boolean(String((cat.learners_by_code || {})[code] || '').trim());
+  }
+
+  function catalogLabel(tr) {
+    const krw = Number(tr.unit_price_krw || 0).toLocaleString();
+    return `${tr.education_name} · ${tr.period_start} ~ ${tr.period_end} · KRW ${krw}`;
+  }
+
+  function refreshCatalog() {
+    const sel = document.getElementById('catalogSelect');
+    const hint = document.getElementById('catalogFilterHint');
+    const addBtn = document.getElementById('btnAddSelected');
+    const code = selectedEntityCode();
+    const kept = new Set([...sel.selectedOptions].map(o => o.value));
+    sel.innerHTML = '';
+    let visible = 0;
+    if (code) {
+      CATALOG.forEach(tr => {
+        if (!trainingHasLearners(tr.id)) return;
+        const opt = document.createElement('option');
+        opt.value = String(tr.id);
+        opt.textContent = catalogLabel(tr);
+        if (kept.has(opt.value)) opt.selected = true;
+        sel.appendChild(opt);
+        visible += 1;
+      });
+    }
+    if (hint) {
+      if (!code) hint.textContent = {{ t('catalog_need_entity') | tojson }};
+      else if (!visible) hint.textContent = {{ t('catalog_none_for_entity') | tojson }};
+      else hint.textContent = '';
+    }
+    if (addBtn) addBtn.disabled = !visible;
+  }
+
+  function removeIneligibleLines() {
+    document.querySelectorAll('.program-line').forEach(el => {
+      const tid = (el.querySelector('[name="item_training_id"]') || {}).value;
+      if (!tid) return;
+      if (!trainingHasLearners(tid)) el.remove();
+    });
+  }
+  function fillLinkedLearners(force) {
+    document.querySelectorAll('.program-line').forEach(el => {
+      const tid = (el.querySelector('[name="item_training_id"]') || {}).value;
+      const cat = tid ? catalogById[String(tid)] : null;
+      if (!cat || !cat.learners_by_code) return;
+      const ta = el.querySelector('.item-learners');
+      if (!ta) return;
+      if (!force && (ta.value || '').trim()) return;
+      const text = learnersTextFor(cat);
+      ta.value = text;
+      const count = text.split(/\n/).map(s => s.trim()).filter(Boolean).length;
+      if (count) el.querySelector('.item-qty').value = count;
+    });
+    recalc();
+  }
+
+  function addLine(data) {
+    linesEl.insertAdjacentHTML('beforeend', lineHtml(data || {}));
+    bindLine(linesEl.lastElementChild);
+    recalc();
+  }
+
+  function bindLine(el) {
+    el.querySelector('.btn-remove').addEventListener('click', () => {
+      el.remove();
+      recalc();
+    });
+    el.querySelectorAll('input, textarea').forEach(inp => {
+      inp.addEventListener('input', recalc);
+      inp.addEventListener('change', recalc);
+    });
+  }
+
+  document.getElementById('btnAddSelected').addEventListener('click', () => {
+    const sel = document.getElementById('catalogSelect');
+    const picked = [...sel.selectedOptions];
+    if (!picked.length) return;
+    document.querySelectorAll('.program-line').forEach(el => {
+      const title = ((el.querySelector('.item-title') || {}).value || '').trim();
+      const tid = (el.querySelector('[name="item_training_id"]') || {}).value;
+      const learners = ((el.querySelector('.item-learners') || {}).value || '').trim();
+      if (!title && !tid && !learners) el.remove();
+    });
+    picked.filter(opt => trainingHasLearners(opt.value)).forEach(opt => addLine(withCatalogLearners(catalogById[opt.value] || { education_name: opt.textContent })));
+  });
+  document.getElementById('btnAddCustom').addEventListener('click', () => addLine({ qty: 1, unit_price_krw: 0 }));
+  if (subSelect) {
+    subSelect.addEventListener('change', () => {
+      refreshCatalog();
+      fillLinkedLearners(true);
+      removeIneligibleLines();
+      recalc();
+    });
+  }
+  ['exchange_rate','currency'].forEach(id => {
+    document.getElementById(id).addEventListener('input', recalc);
+    document.getElementById(id).addEventListener('change', recalc);
+  });
+
+  function recalc() {
+    let krw = 0;
+    document.querySelectorAll('.program-line').forEach(el => {
+      const learners = (el.querySelector('.item-learners').value || '').split(/\n/).map(s => s.trim()).filter(Boolean);
+      const qtyInput = el.querySelector('.item-qty');
+      let qty = Number(qtyInput.value || 1);
+      if (learners.length) {
+        qty = Math.max(qty, learners.length);
+        qtyInput.value = qty;
+      }
+      const unit = Number(el.querySelector('.item-unit').value || 0);
+      const line = qty * unit;
+      el.querySelector('.item-line-krw').textContent = line.toLocaleString();
+      krw += line;
+    });
+    const rate = Number(document.getElementById('exchange_rate').value || 0);
+    const fx = rate ? (krw / rate) : 0;
+    document.getElementById('previewKrw').textContent = krw.toLocaleString();
+    document.getElementById('previewFx').textContent = document.getElementById('currency').value + ' ' + fx.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  refreshCatalog();
+  if (EXISTING && EXISTING.length) {
+    EXISTING.forEach(row => addLine(row));
+    fillLinkedLearners(false);
+  }
+  recalc();
+</script>
+{% endblock %}

@@ -1,0 +1,8 @@
+instance/
+uploads/
+generated_pdfs/
+outbox/
+__pycache__/
+*.pyc
+.env
+*.db

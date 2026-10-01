@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('all_logs') }}{% endblock %}
+{% block content %}
+<section class="card-panel">
+  <table class="table table-clean">
+    <thead>
+      <tr>
+        <th>{{ t('date') }}</th>
+        <th>{{ t('user') }}</th>
+        <th>{{ t('action') }}</th>
+        <th>{{ t('details') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in rows %}
+      <tr>
+        <td class="mono">{{ log.created_at | dt }}</td>
+        <td>{{ log.username }}</td>
+        <td>{{ log.entity_type }} / {{ log.action }} / {{ log.entity_id }}</td>
+        <td>{{ log.details }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty">{{ t('no_data') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

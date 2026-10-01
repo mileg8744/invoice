@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block page_title %}{% if current_user.role == 'admin' %}{{ t('invoices') }}{% else %}{{ t('inbox') }}{% endif %}{% endblock %}
+{% block content %}
+{% if current_user.role == 'admin' %}
+<div class="toolbar">
+  <div></div>
+  <div class="toolbar-right">
+    <a class="btn btn-outline-navy" href="{{ url_for('invoice_template') }}">{{ t('download_template') }}</a>
+    <form class="d-inline" method="post" action="{{ url_for('invoices_hq_copy', **request.args) }}" onsubmit="return confirm('{{ t('confirm_hq_bulk') }}');">
+      <button class="btn btn-outline-navy" type="submit"><i class="bi bi-envelope"></i> {{ t('hq_bulk_send') }}</button>
+    </form>
+    <a class="btn btn-navy" href="{{ url_for('invoice_new') }}"><i class="bi bi-plus"></i> {{ t('create_invoice') }}</a>
+  </div>
+</div>
+<div class="card-panel mb-3">
+  <form class="upload-inline wrap" method="post" action="{{ url_for('invoice_upload') }}" enctype="multipart/form-data">
+    <strong>{{ t('bulk_invoice') }}</strong>
+    <span class="muted">{{ t('group_note') }}</span>
+    <select class="form-select" name="currency" style="max-width:110px">
+      <option>USD</option>
+      <option>EUR</option>
+    </select>
+    <input class="form-control" style="max-width:140px" name="exchange_rate" placeholder="{{ t('rate') }}" required>
+    <input class="form-control" style="max-width:160px" type="date" name="rate_date" value="{{ today }}" required>
+    <input class="form-control" type="file" name="file" accept=".xlsx,.xls,.csv" required>
+    <button class="btn btn-navy" type="submit">{{ t('upload') }}</button>
+  </form>
+</div>
+{% endif %}
+
+<form class="filter-bar" method="get">
+  <select class="form-select" name="year">
+    <option value="">{{ t('year') }}</option>
+    {% for y in years %}
+    <option value="{{ y }}" {% if filters.year == y|string %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+  <select class="form-select" name="half">
+    <option value="">{{ t('half') }}</option>
+    <option value="1" {% if filters.half == '1' %}selected{% endif %}>{{ t('half_1') }}</option>
+    <option value="2" {% if filters.half == '2' %}selected{% endif %}>{{ t('half_2') }}</option>
+  </select>
+  <select class="form-select" name="status">
+    <option value="">{{ t('filter_all') }}</option>
+    {% for s in ['draft','issued','acknowledged','paid'] %}
+    <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ t('status_' + s) }}</option>
+    {% endfor %}
+  </select>
+  {% if current_user.role == 'admin' %}
+  <select class="form-select" name="subsidiary">
+    <option value="">{{ t('subsidiary') }}</option>
+    {% for s in subs %}
+    <option value="{{ s.code }}" {% if filters.subsidiary == s.code %}selected{% endif %}>{{ s.code }} · {{ s.name_en }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <input class="form-control" name="q" value="{{ filters.q }}" placeholder="{{ t('search') }}">
+  <button class="btn btn-navy" type="submit">{{ t('filter') }}</button>
+  <a class="btn btn-ghost" href="{{ url_for('invoices') }}">{{ t('reset') }}</a>
+  <a class="btn btn-outline-navy" href="{{ url_for('invoices_export', **request.args) }}">{{ t('export_csv') }}</a>
+</form>
+{% if current_user.role == 'admin' %}
+<p class="muted mb-3">{{ t('hq_bulk_help') }} · {{ t('hq_copy_to') }}: <b>{{ hq_copy_email }}</b></p>
+{% endif %}
+
+<section class="card-panel">
+  <div class="table-responsive">
+    <table class="table table-clean">
+      <thead>
+        <tr>
+          <th>{{ t('invoice_no') }}</th>
+          <th>{{ t('subsidiary') }}</th>
+          <th>{{ t('education') }}</th>
+          <th>{{ t('period') }}</th>
+          <th class="text-end">{{ t('qty') }}</th>
+          <th class="text-end">KRW</th>
+          <th class="text-end">FX</th>
+          <th>{{ t('status') }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="mono"><a href="{{ url_for('invoice_detail', iid=row.id) }}">{{ row.invoice_no }}</a></td>
+          <td>{{ row.subsidiary.code }}<div class="tiny">{{ row.subsidiary.name_en }}</div></td>
+          <td>{{ row.education_name }}</td>
+          <td>{{ row.period_start | ymd }} ~ {{ row.period_end | ymd }}</td>
+          <td class="text-end">{{ row.qty }}</td>
+          <td class="text-end">{{ row.amount_krw | krw }}</td>
+          <td class="text-end">{{ row.currency }} {{ row.amount_fx | fx }}</td>
+          <td><span class="badge-status s-{{ row.status }}">{{ status_label(row.status) }}</span></td>
+          <td class="text-nowrap">
+            <a class="btn btn-sm btn-outline-navy" href="{{ url_for('invoice_detail', iid=row.id) }}">{{ t('view') }}</a>
+            {% if current_user.role == 'admin' %}
+            <form class="d-inline" method="post" action="{{ url_for('invoice_delete', iid=row.id) }}" onsubmit="return confirm('{{ t('confirm_delete_invoice') }}');">
+              <button class="btn btn-sm btn-ghost" type="submit">{{ t('delete') }}</button>
+            </form>
+            {% endif %}
+            {% if current_user.role == 'subsidiary' %}
+            <a class="btn btn-sm btn-ghost" href="{{ url_for('invoice_detail', iid=row.id) }}#learner-roster">{{ t('view_roster') }}</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="empty">{% if current_user.role == 'admin' %}{{ t('no_data') }}{% else %}{{ t('empty_inbox') }}{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

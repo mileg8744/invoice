@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block page_title %}{{ t('detail') }} {{ row.invoice_no }}{% endblock %}
+{% block content %}
+<div class="detail-head">
+  <div>
+    <div class="mono">{{ row.invoice_no }}</div>
+    <h2 class="h4 mb-1">{{ row.education_name }}</h2>
+    <span class="badge-status s-{{ row.status }}">{{ status_label(row.status) }}</span>
+    <span class="muted ms-2">{{ t('last_modified') }} {{ row.updated_at | dt }}</span>
+  </div>
+  <div class="toolbar-right">
+    <a class="btn btn-outline-navy" href="{{ url_for('invoice_pdf', iid=row.id) }}"><i class="bi bi-file-earmark-pdf"></i> {{ t('view_pdf') }}</a>
+    {% if current_user.role == 'admin' %}
+    <a class="btn btn-outline-navy" href="{{ url_for('invoice_edit', iid=row.id) }}">{{ t('edit') }}</a>
+    {% if row.status == 'draft' %}
+    <form method="post" action="{{ url_for('invoice_issue', iid=row.id) }}" onsubmit="return confirm('{{ t('confirm_issue') }}');">
+      <button class="btn btn-navy" type="submit">{{ t('issue') }}</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('invoice_resend', iid=row.id) }}">
+      <button class="btn btn-outline-navy" type="submit">{{ t('reissue_mail') }}</button>
+    </form>
+    {% if row.status in ['issued','acknowledged'] %}
+    <form method="post" action="{{ url_for('invoice_remind', iid=row.id) }}">
+      <button class="btn btn-ghost" type="submit">{{ t('remind') }}</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    <form method="post" action="{{ url_for('invoice_delete', iid=row.id) }}" onsubmit="return confirm('{{ t('confirm_delete_invoice') }}');">
+      <button class="btn btn-ghost" type="submit">{{ t('delete') }}</button>
+    </form>
+    {% elif current_user.role == 'subsidiary' and row.status == 'issued' %}
+    <form method="post" action="{{ url_for('invoice_ack', iid=row.id) }}" onsubmit="return confirm('{{ t('confirm_ack') }}');">
+      <button class="btn btn-navy" type="submit">{{ t('acknowledge') }}</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-ghost" href="{{ url_for('invoices') }}">{{ t('back') }}</a>
+  </div>
+</div>
+
+{% if current_user.role == 'subsidiary' and row.status == 'issued' %}
+<div class="alert alert-info">{{ t('please_ack') }}</div>
+{% endif %}
+{% if current_user.role == 'admin' %}
+<p class="muted">{{ t('locked_issued') }}</p>
+{% endif %}
+
+<div class="two-col">
+  <section class="card-panel">
+    <h3 class="h6">{{ t('billed_to') }}</h3>
+    <div class="mono">{{ row.subsidiary.code }}</div>
+    <div><b>{{ row.subsidiary.name_en }}</b></div>
+    <div class="muted">{{ row.subsidiary.address_en }}</div>
+    <div class="mt-2 tiny">{{ row.subsidiary.emails }}</div>
+  </section>
+  <section class="card-panel">
+    <h3 class="h6">{{ t('detail') }}</h3>
+    <dl class="kv">
+      <dt>{{ t('period') }}</dt><dd>{{ row.period_start | ymd }} ~ {{ row.period_end | ymd }}</dd>
+      <dt>{{ t('instructor') }}</dt><dd>{{ row.instructor or '-' }}</dd>
+      <dt>{{ t('qty') }}</dt><dd>{{ row.qty }}</dd>
+      <dt>{{ t('unit_krw') }}</dt><dd>{{ row.unit_price_krw | krw }}</dd>
+      <dt>{{ t('amount_krw') }}</dt><dd>{{ row.amount_krw | krw }}</dd>
+      <dt>{{ t('currency') }} / {{ t('rate') }}</dt><dd>{{ row.currency }} · {{ row.exchange_rate }} ({{ row.rate_date | ymd }})</dd>
+      <dt>{{ t('net_due') }}</dt><dd><b>{{ row.currency }} {{ row.amount_fx | fx }}</b></dd>
+      <dt>{{ t('vat') }}</dt><dd>{{ t('exempt') }}</dd>
+    </dl>
+  </section>
+</div>
+
+<section class="card-panel">
+  <h3 class="h6">{{ t('items') }}</h3>
+  <table class="table table-clean">
+    <thead>
+      <tr>
+        <th>{{ t('education') }}</th>
+        <th>{{ t('period') }}</th>
+        <th>{{ t('instructor') }}</th>
+        <th class="text-end">{{ t('qty') }}</th>
+        <th class="text-end">{{ t('unit_krw') }}</th>
+        <th class="text-end">{{ t('amount_krw') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in row.items %}
+      <tr>
+        <td>{{ it.description or row.education_name }}</td>
+        <td>
+          {% if it.period_start %}{{ it.period_start | ymd }} ~ {{ it.period_end | ymd }}
+          {% else %}{{ row.period_start | ymd }} ~ {{ row.period_end | ymd }}{% endif %}
+        </td>
+        <td>{{ it.instructor or row.instructor or t('none') }}</td>
+        <td class="text-end">{{ it.qty }}</td>
+        <td class="text-end">{{ it.unit_price_krw | krw }}</td>
+        <td class="text-end">{{ it.amount_krw | krw }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card-panel" id="learner-roster">
+  <h3 class="h6">{{ t('learner_roster') }}</h3>
+  <p class="muted mb-3">{{ t('learner_roster_hint') }}</p>
+  <div class="table-responsive">
+    <table class="table table-clean roster-table">
+      <thead>
+        <tr>
+          <th style="width:72px">#</th>
+          <th>{{ t('program_name') }}</th>
+          <th>{{ t('learner_name') }}</th>
+          <th>{{ t('learner_email') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for person in roster %}
+        <tr>
+          <td class="mono">{{ loop.index }}</td>
+          <td>{{ person.program or '-' }}</td>
+          <td>{{ person.name or '-' }}</td>
+          <td class="mono">{{ person.email or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">{{ t('no_learners') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="two-col">
+  <section class="card-panel">
+    <h3 class="h6">{{ t('history') }}</h3>
+    <dl class="kv">
+      <dt>{{ t('created_at') }}</dt><dd>{{ row.created_at | dt }}</dd>
+      <dt>{{ t('issued_at') }}</dt><dd>{{ row.issued_at | dt }} {% if row.issued_by %}({{ row.issued_by }}){% endif %}</dd>
+      <dt>{{ t('acked_at') }}</dt><dd>{{ row.acknowledged_at | dt }} {% if row.acknowledged_by %}({{ row.acknowledged_by }}){% endif %}</dd>
+      <dt>{{ t('paid_at') }}</dt><dd>{{ row.paid_at | dt }} {% if row.payment_date %} / {{ row.payment_date | ymd }}{% endif %}</dd>
+      <dt>{{ t('memo') }}</dt><dd>{{ row.paid_memo or '-' }}</dd>
+    </dl>
+  </section>
+  {% if current_user.role == 'admin' and row.status in ['issued','acknowledged'] %}
+  <section class="card-panel">
+    <h3 class="h6">{{ t('mark_paid') }}</h3>
+    <p class="muted">{{ t('mark_paid_hint') }}</p>
+    <form method="post" action="{{ url_for('invoice_paid', iid=row.id) }}">
+      <div class="mb-3">
+        <label class="form-label">{{ t('payment_date') }}</label>
+        <input class="form-control" type="date" name="payment_date" value="{{ today }}" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">{{ t('memo') }}</label>
+        <textarea class="form-control" name="paid_memo" rows="2"></textarea>
+      </div>
+      <button class="btn btn-navy" type="submit">{{ t('mark_paid') }}</button>
+    </form>
+  </section>
+  {% else %}
+  <section class="card-panel">
+    <h3 class="h6">{{ t('logs') }}</h3>
+    <ul class="log-list">
+      {% for log in logs %}
+      <li><span class="mono">{{ log.created_at | dt }}</span> {{ log.action }} · {{ log.username }}<div class="tiny">{{ log.details }}</div></li>
+      {% else %}
+      <li class="muted">{{ t('no_data') }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% from "macros.html" import address_en_field with context %}
+{% block page_title %}{{ t('hq_settings') }}{% endblock %}
+{% block content %}
+<form method="post">
+  <section class="card-panel mb-3" style="max-width:860px">
+    <div class="section-head">
+      <h2>{{ t('hq_contact') }}</h2>
+    </div>
+    <p class="muted">{{ t('hq_settings_help') }}</p>
+    <div class="mb-3">
+      <label class="form-label">{{ t('hq_copy_to') }}</label>
+      <input class="form-control" name="hq_copy_email" value="{{ hq.HQ_COPY_EMAIL }}" required>
+      <p class="muted mt-1 mb-0">{{ t('hq_copy_email_hint') }}</p>
+    </div>
+    <div class="mb-0">
+      <label class="form-label">{{ t('mail_from') }}</label>
+      <input class="form-control" name="mail_from" value="{{ hq.MAIL_FROM }}">
+    </div>
+  </section>
+
+  <section class="card-panel mb-3" style="max-width:860px">
+    <div class="section-head">
+      <h2>{{ t('hq_profile') }}</h2>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">{{ t('pgu_name') }}</label>
+      <input class="form-control" name="pgu_name" value="{{ hq.PGU_NAME }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">{{ t('pgu_dept') }}</label>
+      <input class="form-control" name="pgu_dept" value="{{ hq.PGU_DEPT }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">{{ t('address_en') }}</label>
+      {{ address_en_field('pgu_address', hq.PGU_ADDRESS, 3, true, 'Republic of Korea') }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">{{ t('phone') }}</label>
+      <input class="form-control" name="pgu_phone" value="{{ hq.PGU_PHONE }}">
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">{{ t('pgu_signatory') }}</label>
+        <input class="form-control" name="pgu_signatory" value="{{ hq.PGU_SIGNATORY }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">{{ t('pgu_title') }}</label>
+        <input class="form-control" name="pgu_title" value="{{ hq.PGU_TITLE }}">
+      </div>
+    </div>
+  </section>
+
+  <section class="card-panel mb-3" style="max-width:860px">
+    <div class="section-head">
+      <h2>{{ t('wire') }}</h2>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">{{ t('bank_name') }}</label>
+        <input class="form-control" name="bank_name" value="{{ hq.BANK_NAME }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">{{ t('bank_branch') }}</label>
+        <input class="form-control" name="bank_branch" value="{{ hq.BANK_BRANCH }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">{{ t('bank_account_name') }}</label>
+        <input class="form-control" name="bank_account_name" value="{{ hq.BANK_ACCOUNT_NAME }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">{{ t('bank_account_no') }}</label>
+        <input class="form-control" name="bank_account_no" value="{{ hq.BANK_ACCOUNT_NO }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">{{ t('bank_swift') }}</label>
+        <input class="form-control" name="bank_swift" value="{{ hq.BANK_SWIFT }}">
+      </div>
+    </div>
+    <div class="mt-4">
+      <button class="btn btn-navy" type="submit">{{ t('save') }}</button>
+    </div>
+  </section>
+</form>
+
+<section class="card-panel" style="max-width:860px">
+  <div class="section-head">
+    <h2>{{ t('stamp') }}</h2>
+  </div>
+  <p class="muted">{{ t('stamp_hint') }}</p>
+  {% if stamp_exists %}
+  <img class="stamp-preview" src="{{ url_for('stamp_preview') }}" alt="{{ t('stamp') }}">
+  {% else %}
+  <p class="muted">{{ t('stamp_none') }}</p>
+  {% endif %}
+  <div class="d-flex gap-2 flex-wrap align-items-end mt-3">
+    <form method="post" action="{{ url_for('stamp_upload') }}" enctype="multipart/form-data" class="d-flex gap-2 flex-wrap align-items-end">
+      <input class="form-control" type="file" name="stamp" accept=".png,.jpg,.jpeg,.webp,.gif" required>
+      <button class="btn btn-navy" type="submit">{{ t('stamp_upload') }}</button>
+    </form>
+    {% if stamp_exists %}
+    <form method="post" action="{{ url_for('stamp_delete') }}" onsubmit="return confirm('{{ t('stamp_remove') }}');">
+      <button class="btn btn-ghost" type="submit">{{ t('stamp_remove') }}</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
